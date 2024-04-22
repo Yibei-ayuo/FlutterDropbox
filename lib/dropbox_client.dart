@@ -5,8 +5,7 @@ import 'package:dropbox_client/account_info.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
-typedef DropboxProgressCallback = void Function(
-    int currentBytes, int totalBytes);
+typedef DropboxProgressCallback = void Function(int currentBytes, int totalBytes);
 
 class _CallbackInfo {
   int filesize;
@@ -27,9 +26,7 @@ class Dropbox {
   static Future<bool> init(String clientId, String key, String secret) async {
     _channel.setMethodCallHandler(_handleMethodCall);
 
-    return await _channel.invokeMethod(
-            'init', {'clientId': clientId, 'key': key, 'secret': secret}) ??
-        false;
+    return await _channel.invokeMethod('init', {'clientId': clientId, 'key': key, 'secret': secret}) ?? false;
   }
 
   static Future<void> _handleMethodCall(MethodCall call) async {
@@ -73,8 +70,7 @@ class Dropbox {
   /// use getAccessToken() to get Access Token after successful authorize().
   /// authorizeWithAccessToken() will authorize without user interaction if access token is valid.
   static Future<void> authorizeWithAccessToken(String accessToken) async {
-    await _channel
-        .invokeMethod('authorizeWithAccessToken', {'accessToken': accessToken});
+    await _channel.invokeMethod('authorizeWithAccessToken', {'accessToken': accessToken});
   }
 
   /// Authorize with Credentials
@@ -83,8 +79,7 @@ class Dropbox {
   /// authorizeWithCredentials() will authorize without user interaction if access and refresh tokens are valid.
   /// It should automatically refresh the access token if expired
   static Future<void> authorizeWithCredentials(String credentials) async {
-    await _channel
-        .invokeMethod('authorizeWithCredentials', {'credentials': credentials});
+    await _channel.invokeMethod('authorizeWithCredentials', {'credentials': credentials});
   }
 
   // static Future<String> getAuthorizeUrl() async {
@@ -118,38 +113,36 @@ class Dropbox {
   /// get folder/file list for path.
   ///
   /// returns List<dynamic>. Use path='' for accessing root folder. List items are not sorted.
-  static Future listFolder(String path) async {
-    return await _channel.invokeMethod('listFolder', {'path': path});
+  static Future listFolder(String path, String credentials) async {
+    return await _channel.invokeMethod('listFolder', {'path': path, 'credentials': credentials});
   }
 
   /// get temporary link url for file
   ///
   /// returns url for accessing dropbox file.
-  static Future<String?> getTemporaryLink(String path) async {
-    return await _channel.invokeMethod('getTemporaryLink', {'path': path});
+  static Future<String?> getTemporaryLink(String path, String credentials) async {
+    return await _channel.invokeMethod('getTemporaryLink', {'path': path, 'credentials': credentials});
   }
 
   /// get base64 string of thumbnail for image file
   ///
   /// returns base64 string of thumbnail for dropbox image file.
-  static Future<String?> getThumbnailBase64String(String path) async {
-    return await _channel
-        .invokeMethod('getThumbnailBase64String', {'path': path});
+  static Future<String?> getThumbnailBase64String(String path, String credentials) async {
+    return await _channel.invokeMethod('getThumbnailBase64String', {'path': path, 'credentials': credentials});
   }
 
   /// upload local file in filepath to dropboxpath.
   ///
   /// filepath is local file path. dropboxpath should start with /.
   /// callback for monitoring progress : (uploadedBytes, totalBytes) { } (can be null)
-  static Future upload(String filepath, String dropboxpath,
-      [DropboxProgressCallback? callback]) async {
+  static Future upload(String credentials, String filepath, String dropboxpath, [DropboxProgressCallback? callback]) async {
     final fileSize = File(filepath).lengthSync();
     final key = ++_callbackInt;
 
     _callbackMap[key] = _CallbackInfo(fileSize, callback);
 
-    final ret = await _channel.invokeMethod('upload',
-        {'filepath': filepath, 'dropboxpath': dropboxpath, 'key': key});
+    final ret =
+        await _channel.invokeMethod('upload', {'filepath': filepath, 'dropboxpath': dropboxpath, 'key': key, 'credentials': credentials});
 
     _callbackMap.remove(key);
 
@@ -160,14 +153,13 @@ class Dropbox {
   ///
   /// filepath is local file path. dropboxpath should start with /.
   /// callback for monitoring progress : (downloadedBytes, totalExpectedBytes) { } (can be null)
-  static Future download(String dropboxpath, String filepath,
-      [DropboxProgressCallback? callback]) async {
+  static Future download(String credentials, String dropboxpath, String filepath, [DropboxProgressCallback? callback]) async {
     final key = ++_callbackInt;
 
     _callbackMap[key] = _CallbackInfo(0, callback);
 
-    final ret = await _channel.invokeMethod('download',
-        {'filepath': filepath, 'dropboxpath': dropboxpath, 'key': key});
+    final ret =
+        await _channel.invokeMethod('download', {'filepath': filepath, 'dropboxpath': dropboxpath, 'key': key, 'credentials': credentials});
 
     _callbackMap.remove(key);
 
@@ -180,6 +172,7 @@ class Dropbox {
   /// else it returns an AccountInfo object.
   static Future<AccountInfo?> getCurrentAccount({
     bool forceCredentialsUse = false,
+    required String credentials,
   }) async {
     String? accessToken;
 
@@ -188,14 +181,11 @@ class Dropbox {
     }
 
     if (accessToken == null) {
-      final credentials = await Dropbox.getCredentials();
-      if (credentials != null) {
-        try {
-          final jsonCredentials = jsonDecode(credentials);
-          accessToken = jsonCredentials['access_token'];
-        } catch (_) {
-          return null;
-        }
+      try {
+        final jsonCredentials = jsonDecode(credentials);
+        accessToken = jsonCredentials['access_token'];
+      } catch (_) {
+        return null;
       }
     }
 
@@ -203,10 +193,8 @@ class Dropbox {
       return null;
     }
 
-    final url =
-        Uri.parse('https://api.dropboxapi.com/2/users/get_current_account');
-    final response =
-        await http.post(url, headers: {'Authorization': 'Bearer $accessToken'});
+    final url = Uri.parse('https://api.dropboxapi.com/2/users/get_current_account');
+    final response = await http.post(url, headers: {'Authorization': 'Bearer $accessToken'});
     final jsonBody = jsonDecode(response.body);
     if (jsonBody['account_id'] == null) {
       return null;

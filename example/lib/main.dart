@@ -8,9 +8,9 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String dropbox_clientId = 'test-flutter-dropbox';
-const String dropbox_key = 'dropbox_key';
-const String dropbox_secret = 'dropbox_secret';
+const String dropbox_clientId = 'ddd';
+const String dropbox_key = 'no025u11t9fyqyy';
+const String dropbox_secret = 'jkkkbty98nqmqzp';
 
 void main() {
   return runApp(MyApp());
@@ -46,7 +46,7 @@ class _HomeState extends State<Home> {
       return;
     }
 
-    await Dropbox.init(dropbox_clientId, dropbox_key, dropbox_secret);
+    await Dropbox.init("ddd", "no025u11t9fyqyy", "jkkkbty98nqmqzp");
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
     accessToken = prefs.getString('dropboxAccessToken');
@@ -58,7 +58,7 @@ class _HomeState extends State<Home> {
   Future<bool> checkAuthorized(bool authorize) async {
     final _credentials = await Dropbox.getCredentials();
     if (_credentials != null) {
-      if (credentials == null || _credentials!.isEmpty) {
+      if (credentials == null || _credentials.isEmpty) {
         credentials = _credentials;
         SharedPreferences prefs = await SharedPreferences.getInstance();
         prefs.setString('dropboxCredentials', credentials!);
@@ -106,6 +106,20 @@ class _HomeState extends State<Home> {
 
   Future authorizePKCE() async {
     await Dropbox.authorizePKCE();
+    int tryCnt = 0;
+    String? creden = await Dropbox.getCredentials();
+    while (creden == null) {
+      tryCnt++;
+      debugPrint("getCredentials: tryCnt:$tryCnt");
+      int delayMs = 100;
+      if (tryCnt > 1000) {
+        delayMs = (tryCnt ~/ 1000) * 1000;
+      }
+      await Future.delayed(Duration(milliseconds: delayMs), () {});
+      creden = await Dropbox.getCredentials();
+    }
+    credentials = creden;
+    debugPrint("credentials: $credentials");
   }
 
   Future unlinkToken() async {
@@ -145,7 +159,7 @@ class _HomeState extends State<Home> {
 
   Future listFolder(path) async {
     if (await checkAuthorized(true)) {
-      final result = await Dropbox.listFolder(path);
+      final result = await Dropbox.listFolder(path, credentials!);
       setState(() {
         list.clear();
         list.addAll(result);
@@ -157,11 +171,9 @@ class _HomeState extends State<Home> {
     if (await checkAuthorized(true)) {
       var tempDir = await getTemporaryDirectory();
       var filepath = '${tempDir.path}/test_upload.txt';
-      File(filepath).writeAsStringSync(
-          'contents.. from ' + (Platform.isIOS ? 'iOS' : 'Android') + '\n');
+      File(filepath).writeAsStringSync('contents.. from ' + (Platform.isIOS ? 'iOS' : 'Android') + '\n');
 
-      final result =
-          await Dropbox.upload(filepath, '/test_upload.txt', (uploaded, total) {
+      final result = await Dropbox.upload(credentials!, filepath, '/test_upload.txt', (uploaded, total) {
         print('progress $uploaded / $total');
       });
       print(result);
@@ -174,8 +186,7 @@ class _HomeState extends State<Home> {
       var filepath = '${tempDir.path}/test_download.zip'; // for iOS only!!
       print(filepath);
 
-      final result = await Dropbox.download('/file_in_dropbox.zip', filepath,
-          (downloaded, total) {
+      final result = await Dropbox.download(credentials!, '/file_in_dropbox.zip', filepath, (downloaded, total) {
         print('progress $downloaded / $total');
       });
 
@@ -185,14 +196,14 @@ class _HomeState extends State<Home> {
   }
 
   Future<String?> getTemporaryLink(path) async {
-    final result = await Dropbox.getTemporaryLink(path);
+    final result = await Dropbox.getTemporaryLink(path, credentials!);
     return result;
   }
 
   Uint8List? thumbImage;
 
   Future getThumbnail(path) async {
-    final b64 = await Dropbox.getThumbnailBase64String(path);
+    final b64 = await Dropbox.getThumbnailBase64String(path, credentials!);
 
     setState(() {
       thumbImage = base64Decode(b64!);
@@ -200,13 +211,13 @@ class _HomeState extends State<Home> {
   }
 
   Future getAccountInfo() async {
-    final accountInfo = await Dropbox.getCurrentAccount();
+    final accountInfo = await Dropbox.getCurrentAccount(credentials: credentials!);
 
     if (accountInfo != null) {
       print(accountInfo.name!.displayName);
       print(accountInfo.email!);
       print(accountInfo.rootInfo!.homeNamespaceId!);
-      print(accountInfo.profilePhotoUrl!);
+      // print(accountInfo.profilePhotoUrl!);
     }
   }
 
@@ -234,9 +245,7 @@ class _HomeState extends State<Home> {
                         ),
                         ElevatedButton(
                           child: Text('authorizeWithAccessToken'),
-                          onPressed: accessToken == null
-                              ? null
-                              : authorizeWithAccessToken,
+                          onPressed: accessToken == null ? null : authorizeWithAccessToken,
                         ),
                         ElevatedButton(
                           child: Text('unlink'),
@@ -252,9 +261,7 @@ class _HomeState extends State<Home> {
                         ),
                         ElevatedButton(
                           child: Text('authorizeWithCredentials'),
-                          onPressed: credentials == null
-                              ? null
-                              : authorizeWithCredentials,
+                          onPressed: credentials == null ? null : authorizeWithCredentials,
                         ),
                         ElevatedButton(
                           child: Text('unlink'),
@@ -317,10 +324,8 @@ class _HomeState extends State<Home> {
                               onTap: () async {
                                 if (isFile) {
                                   final link = await getTemporaryLink(path);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content: Text(link ??
-                                              'getTemporaryLink error: $path')));
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(SnackBar(content: Text(link ?? 'getTemporaryLink error: $path')));
                                 } else {
                                   await listFolder(path);
                                 }
@@ -349,19 +354,15 @@ class Instructions extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-              'You need to get dropbox_key & dropbox_secret from https://www.dropbox.com/developers'),
+          Text('You need to get dropbox_key & dropbox_secret from https://www.dropbox.com/developers'),
           SizedBox(height: 20),
           Text('1. Update dropbox_key and dropbox_secret from main.dart'),
           SizedBox(height: 20),
-          Text(
-              "  const String dropbox_key = 'DROPBOXKEY';\n  const String dropbox_secret = 'DROPBOXSECRET';"),
+          Text("  const String dropbox_key = 'DROPBOXKEY';\n  const String dropbox_secret = 'DROPBOXSECRET';"),
           SizedBox(height: 20),
-          Text(
-              '2. (Android) Update dropbox_key from android/app/src/main/AndroidManifest.xml.\n  <data android:scheme="db-DROPBOXKEY" />'),
+          Text('2. (Android) Update dropbox_key from android/app/src/main/AndroidManifest.xml.\n  <data android:scheme="db-DROPBOXKEY" />'),
           SizedBox(height: 20),
-          Text(
-              '2. (iOS) Update dropbox_key from ios/Runner/Info.plist.\n  <string>db-DROPBOXKEY</string>'),
+          Text('2. (iOS) Update dropbox_key from ios/Runner/Info.plist.\n  <string>db-DROPBOXKEY</string>'),
         ],
       ),
     );
