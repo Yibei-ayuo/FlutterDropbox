@@ -235,8 +235,14 @@ public class DropboxPlugin implements FlutterPlugin, MethodCallHandler, Activity
                 DbxCredential.Reader.readFully(argCredentials);
                 DbxClientV2 client = clientV2Map.get(argCredentials);
                 if (client == null) {
-                    result.error("error", "client not logged in", null);
-                    return;
+                    DbxCredential creds;
+                    try {
+                        creds = DbxCredential.Reader.readFully(argCredentials);
+                        client = new DbxClientV2(sDbxRequestConfig, creds);
+                        clientV2Map.put(argCredentials, client);
+                    } catch (JsonReadException e) {
+                        throw new IllegalStateException("Credential data corrupted: " + e.getMessage());
+                    }
                 }
                 (new ListFolderTask(result, client)).execute(path);
             } catch (JsonReadException e) {
