@@ -9,8 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String dropbox_clientId = 'ddd';
-const String dropbox_key = 'no025u11t9fyqyy';
-const String dropbox_secret = 'jkkkbty98nqmqzp';
+const String dropbox_key = 'dropbox_key';
+const String dropbox_secret = 'dropbox_secret';
 
 void main() {
   return runApp(MyApp());
